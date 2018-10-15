@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Reminders</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="master-container">
+
+            <div class="menu-sidebar">
+                <div class="menu-add-button">
+                    <div class="menu-add-icon"></div>
+                </div>
+            </div>
+        
+            <div class="content-sidebar">
+                <ul id="reminderList"></ul>
+            </div>
+        
+            <div class="content-view"></div>
+
+    </div>
+
+    
+    
+
+    <script>
+        const scheduler = require('./scheduler');
+        const moment = require('moment');
+        const electron = require('electron');
+        const {ipcRenderer} = electron;
+
+        const reminderList = document.querySelector('#reminderList');
+
+        // Send request to load schedule into memory
+        ipcRenderer.send('schedule:load', 0);
+
+
+        // Render methods
+        ipcRenderer.on('schedule:loaded', function(e, scheduleList) {
+            renderScheduleList(scheduleList);
+        });
+
+        ipcRenderer.on('save:reminder', function(e, reminderObj) {
+            renderSideReminder(reminderObj);
+        });
+
+        ipcRenderer.on('update:reminder', function(e, reminderObj) {
+            updateSideReminder(reminderObj);
+        });
+
+        ipcRenderer.on('request:reminder', function(e, reminder) {
+            renderReminderForm(reminder);
+        });
+
+        function renderReminderForm(reminder) {
+
+            const mainPanel = document.querySelector('.content-view');
+            mainPanel.innerHTML = '';
+
+            // Text content container
+            let container = document.createElement('div');
+            container.classList.add('content-container');
+
+                let idTag = document.createElement('div');
+                idTag.setAttribute('style','display: none;');
+                if (reminder) idTag.setAttribute('data-id', reminder.id);
+
+                let headline = document.createElement('input');
+                headline.setAttribute('type', 'text');
+                headline.classList.add('content-headline');
+                headline.value = reminder ? reminder.title : '';
+
+                let message = document.createElement('textarea');
+                message.classList.add('content-message');
+                message.removeAttribute('style');
+                message.innerText = reminder ? reminder.message : '';
+
+                container.appendChild(headline);
+                container.appendChild(message);
+
+            // Settings container
+            let settingsContainer = document.createElement('div');
+            settingsContainer.classList.add('content-settings-container');
+
+                let settingsTitle = document.createElement('div');
+                settingsTitle.classList.add('content-settings-title');
+                settingsTitle.innerText = 'Settings';
+
+                let settings = document.createElement('div');
+                settings.classList.add('content-settings');
+
+                    let dateSettingsContainer = document.createElement('div');
+                    dateSettingsContainer.classList.add('content-settings-block');
+
+                        const currentTime = moment();
+                        let reminderTime = reminder ? moment(reminder.remindFrom) : moment().add(1,'hours');
+
+                        let dateLabel = document.createElement('label');
+                        dateLabel.setAttribute('for', 'settings-date');
+                        dateLabel.innerHTML = 'remind from';
+                        dateLabel.classList.add('setting-label');
+
+                        let dateInput = document.createElement('div');
+                        dateInput.setAttribute('id', 'settings-date');
+                        dateInput.classList.add('content-date-input');
+
+                            let dateDay = document.createElement('input');
+                            dateDay.setAttribute('type','number');
+                            dateDay.setAttribute('value', reminderTime.format('DD'));
+                            dateDay.classList.add('content-date-input-day');
+                            makeInputScrollable(dateDay,'days');
+
+                            let slash = document.createElement('div');
+                            slash.innerText = '/';
+                            slash.classList.add('date-slash');
+
+                            let dateMonth = document.createElement('input');
+                            dateMonth.setAttribute('type','number');
+                            dateMonth.setAttribute('value',reminderTime.format('MM'));
+                            dateMonth.classList.add('content-date-input-month');
+                            makeInputScrollable(dateMonth,'months');
+
+                            let slash2 = document.createElement('div');
+                            slash2.innerText = '/';
+                            slash2.classList.add('date-slash');
+
+                            let dateYear = document.createElement('input');
+                            dateYear.setAttribute('type','text');
+                            dateYear.setAttribute('value',reminderTime.format('YY'));
+                            dateYear.classList.add('content-date-input-year');
+                            makeInputScrollable(dateYear,'years');
+
+                            dateInput.appendChild(dateDay);
+                            dateInput.appendChild(slash);
+                            dateInput.appendChild(dateMonth);
+                            dateInput.appendChild(slash2);
+                            dateInput.appendChild(dateYear);
+
+                        let timeInput = document.createElement('div');
+                        timeInput.classList.add('content-date-time-container');
+
+                            let timeH = document.createElement('input');
+                            timeH.setAttribute('type','number');
+                            timeH.setAttribute('value',reminderTime.format('hh'));
+                            timeH.classList.add('content-date-time-hours');
+                            makeInputScrollable(timeH,'hours');
+
+                            let colon = document.createElement('div');
+                            colon.classList.add('date-colon');
+                            colon.innerText = ':';
+
+                            let timeM = document.createElement('input');
+                            timeM.setAttribute('type','number');
+                            timeM.setAttribute('value',reminderTime.format('mm'));
+                            timeM.classList.add('content-date-time-minutes');
+                            makeInputScrollable(timeM,'minutes');
+
+                            let ampm = document.createElement('div');
+                            ampm.classList.add('content-date-time-ampm');
+
+                                let am = document.createElement('div');
+                                am.classList.add('content-date-time-am');
+                                am.innerText = 'am';
+
+                                let pm = document.createElement('div');
+                                pm.classList.add('content-date-time-pm');
+                                pm.innerText = 'pm';
+
+                                if (reminderTime.format('a') === 'am') {
+                                    am.classList.add('selected');
+                                } else {
+                                    pm.classList.add('selected');
+                                }
+
+                                ampm.appendChild(am);
+                                ampm.appendChild(pm);
+                                ampm.addEventListener('click', (e) => {
+                                    if (e.target === am) {
+                                        if (!am.classList.contains('selected')) {
+                                            reminderTime.subtract(12,'hours');
+                                        }
+                                        am.classList.add('selected');
+                                        pm.classList.remove('selected');
+                                    }
+                                    else if (e.target === pm) {
+                                        if (!pm.classList.contains('selected')) {
+                                            reminderTime.add(12,'hours');
+                                        }
+                                        pm.classList.add('selected');
+                                        am.classList.remove('selected');
+                                    }
+                                });
+
+                            timeInput.appendChild(timeH);
+                            timeInput.appendChild(colon);
+                            timeInput.appendChild(timeM);
+                            timeInput.appendChild(ampm);
+                    
+                        dateSettingsContainer.appendChild(dateLabel);
+                        dateSettingsContainer.appendChild(dateInput);
+                        dateSettingsContainer.appendChild(timeInput);
+
+                    let reminderIntervalContainer = document.createElement('div');
+                    reminderIntervalContainer.classList.add('content-settings-block');
+
+                        let intervalLabel = document.createElement('label');
+                        intervalLabel.classList.add('setting-label');
+                        intervalLabel.innerText = 'recurring';
+
+                        let intervalInput = document.createElement('div');
+                        intervalInput.classList.add('content-interval-input');
+
+                            let intervalRadio = document.createElement('div');
+                            intervalRadio.classList.add('content-interval-yesno');
+                                
+                                let intervalYes = document.createElement('div');
+                                intervalYes.classList.add('content-interval-yes');
+                                intervalYes.innerText = 'yes';
+
+                                let intervalNo = document.createElement('div');
+                                intervalNo.classList.add('content-interval-no');
+                                intervalNo.innerText = 'no';
+
+                                if (reminder) {
+                                    reminder.interval ? intervalYes.classList.add('selected') : intervalNo.classList.add('selected');
+                                }
+                                else {
+                                    intervalNo.classList.add('selected');
+                                }
+
+                                intervalRadio.appendChild(intervalYes);
+                                intervalRadio.appendChild(intervalNo);
+                                intervalRadio.addEventListener('click', (e) => {
+                                    if (e.target === intervalYes) {
+                                        intervalYes.classList.add('selected');
+                                        intervalNo.classList.remove('selected');
+                                        intervalSelectorLabel.setAttribute('style', null);
+                                        intervalNumberInput.disabled = false;
+                                        intervalPeriod.disabled = false;
+                                    }
+                                    else if (e.target === intervalNo) {
+                                        intervalNo.classList.add('selected');
+                                        intervalYes.classList.remove('selected');
+                                        intervalSelectorLabel.style.color = 'rgb(84,84,84)';
+                                        intervalNumberInput.disabled = true;
+                                        intervalPeriod.disabled = true;
+                                    }
+                                });
+
+                            let intervalSelectorLabel = document.createElement('label');
+                            intervalSelectorLabel.classList.add('content-interval-label');
+                            intervalSelectorLabel.innerText = 'every ';
+                            if (reminder) {
+                                intervalSelectorLabel.style.color = reminder.interval ? '' : 'rgb(84,84,84)';
+                            }
+
+                            let intervalTimeSelector = document.createElement('div');
+                            intervalTimeSelector.classList.add('content-interval-selector');
+
+                                let intervalNumberInput = document.createElement('input');
+                                intervalNumberInput.setAttribute('type','number');
+                                let intervalNum = 0;
+                                if (reminder) {
+                                    intervalNum = reminder.interval ? reminder.interval.time : 0;
+                                }
+                                intervalNumberInput.setAttribute('value',intervalNum);
+                                intervalNumberInput.classList.add('content-interval-number');
+                                if (reminder) {
+                                    intervalNumberInput.disabled = reminder.interval ? false : true;
+                                }
+                                 
+
+                                let intervalPeriod = document.createElement('select');
+                                intervalPeriod.classList.add('content-interval-period');
+                                if (reminder) {
+                                    intervalPeriod.disabled = (reminder.interval && reminder.interval.time > 0) ? false : true;
+                                }
+
+                                    let options = ['minutes','hours','days','weeks','months'];
+                                    options.forEach((label, i) => {
+                                        let op = document.createElement('option');
+                                        op.classList.add('period-option');
+                                        op.value = label;
+                                        op.innerText = label;
+                                        intervalPeriod.appendChild(op);
+                                        if (reminder) {
+                                            if (reminder.interval) {
+                                                intervalPeriod.selectedIndex = (op.value === reminder.interval.units) ? i : 0; 
+                                            }
+                                        }
+                                    });
+
+                                intervalTimeSelector.appendChild(intervalNumberInput);
+                                intervalTimeSelector.appendChild(intervalPeriod);
+
+                            intervalInput.appendChild(intervalRadio);
+                            intervalInput.appendChild(intervalSelectorLabel);
+                            intervalInput.appendChild(intervalTimeSelector);
+
+                        reminderIntervalContainer.appendChild(intervalLabel);
+                        reminderIntervalContainer.appendChild(intervalInput);
+
+                    let reminderStatusContainer = document.createElement('div');
+                    reminderStatusContainer.classList.add('content-settings-block');
+
+                        let statusLabel = document.createElement('label');
+                        statusLabel.classList.add('setting-label');
+                        statusLabel.innerText = 'priority';
+
+                        let statusSelector = document.createElement('select');
+                        statusSelector.classList.add('content-status-list');
+                        statusSelector.addEventListener('change', handleStatusChange);
+
+                        function handleStatusChange(e) {
+                            switch(statusSelector.value) {
+                                case 'urgent':
+                                    intervalYes.classList.remove('chill-color');
+                                    intervalNo.classList.remove('chill-color');
+                                    intervalYes.classList.add('urgent-color');
+                                    intervalNo.classList.add('urgent-color');
+                                    am.classList.remove('chill-color');
+                                    pm.classList.remove('chill-color');
+                                    am.classList.add('urgent-color');
+                                    pm.classList.add('urgent-color');
+                                    button.style.backgroundColor = '#BE412A';
+                                    break;
+                                case 'chill':
+                                    intervalYes.classList.remove('urgent-color');
+                                    intervalNo.classList.remove('urgent-color');
+                                    intervalYes.classList.add('chill-color');
+                                    intervalNo.classList.add('chill-color');
+                                    am.classList.remove('urgent-color');
+                                    pm.classList.remove('urgent-color');
+                                    am.classList.add('chill-color');
+                                    pm.classList.add('chill-color');
+                                    button.style.backgroundColor = '#8AAF22';
+                                    break;
+                                default:
+                                    intervalYes.classList.remove('urgent-color');
+                                    intervalNo.classList.remove('urgent-color');
+                                    intervalYes.classList.remove('chill-color');
+                                    intervalNo.classList.remove('chill-color');
+                                    am.classList.remove('urgent-color');
+                                    pm.classList.remove('urgent-color');
+                                    am.classList.remove('chill-color');
+                                    pm.classList.remove('chill-color');
+                                    button.removeAttribute('style');
+                            }
+                        }
+
+                            let statusOptions = ['normal','urgent','chill'];
+                            statusOptions.forEach((label, i) => {
+                                let op = document.createElement('option');
+                                op.classList.add('status-option');
+                                op.value = label;
+                                op.innerText = label;
+                                statusSelector.appendChild(op);
+                                if (reminder) {
+                                    if (op.value === reminder.status) {
+                                        statusSelector.selectedIndex = i;
+                                    }
+                                }
+                            });
+
+                        reminderStatusContainer.appendChild(statusLabel);
+                        reminderStatusContainer.appendChild(statusSelector);
+
+                    settings.appendChild(dateSettingsContainer);
+                    settings.appendChild(reminderIntervalContainer);
+                    settings.appendChild(reminderStatusContainer);
+                    
+
+                let button = document.createElement('div');
+                button.classList.add('content-save-reminder');
+                button.innerText = 'save';
+
+                button.addEventListener('click', (e) => {
+                    validateReminderForm()
+                        .then((object) => {
+                            if (object.exists) {
+                                console.log('updating reminder...');
+                                delete object.exists;
+                                ipcRenderer.send('update:reminder', object);
+                            } else {
+                                console.log('saving new reminder...');
+                                delete object.exists;
+                                ipcRenderer.send('save:reminder', object);
+                            }
+                        })
+                        .catch((err) => {
+                            console.error(err);
+                            return;
+                        });
+                });
+
+                handleStatusChange();
+
+                settingsContainer.appendChild(settingsTitle);
+                settingsContainer.appendChild(settings);    
+                settingsContainer.appendChild(button);    
+
+            mainPanel.appendChild(container);
+            mainPanel.appendChild(settingsContainer);
+
+            function makeInputScrollable(el,type) {
+                // Scroll event listener
+                el.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    if (e.deltaY > 0) {
+                        reminderTime.subtract(1,type);
+                    }
+                    else {
+                        reminderTime.add(1,type);
+                    }
+                    updateDateDisplay();
+                });
+                // Change event listener
+                let typeSetter = type.substring(0, type.length - 1); // remove pluralisation for moment setter
+                el.addEventListener('change', (e) => {
+                    e.preventDefault();
+                    let val = Number(el.value);
+                    if (typeSetter === 'year' && val < 100) val += 2000;
+                    reminderTime.set(typeSetter, val);
+                    updateDateDisplay();
+                });
+            }
+
+            function updateDateDisplay() {
+                // Update date and time inputs
+                const year = reminderTime.format('YY');
+                dateYear.value = year;
+                dateYear.setAttribute('value',year);
+                const month = reminderTime.format('MM');
+                dateMonth.value = month;
+                dateMonth.setAttribute('value',month);
+                const day = reminderTime.format('DD');
+                dateDay.value = day;
+                dateDay.setAttribute('value',day);
+                const hour = reminderTime.format('hh');
+                timeH.value = hour;
+                timeH.setAttribute('value',hour);
+                const minute = reminderTime.format('mm');
+                timeM.value = minute;
+                timeM.setAttribute('value',minute);
+                // Update AM/PM
+                if (reminderTime.format('a') === 'am') {
+                    am.classList.add('selected');
+                    pm.classList.remove('selected');
+                }
+                else {
+                    pm.classList.add('selected');
+                    am.classList.remove('selected');
+                }
+            }
+
+            async function validateReminderForm() {
+                let valid = true;
+                if (!headline.value) valid = false;
+                if (!message.value) valid = false;
+                if (!dateDay.value) valid = false;
+                if (!dateMonth.value) valid = false;
+                if (!dateYear.value) valid = false;
+                if (!timeH.value) valid = false;
+                if (!timeM.value) valid = false;
+                if (am.classList.contains('selected') && pm.classList.contains('selected')) valid = false;
+                if (intervalYes.classList.contains('selected') && intervalNo.classList.contains('selected')) valid = false;
+                if (!valid) throw 'invalid';
+
+                let object = {};
+                let timeObj = moment().set({
+                    'year': Number(dateYear.value)+2000,
+                    'month': Number(dateMonth.value)-1,
+                    'date': Number(dateDay.value),
+                    'hour': Number(timeH.value),
+                    'minute': Number(timeM.value)
+                });
+                if (pm.classList.contains('selected')) timeObj.hour += 12;
+                let objId = idTag.getAttribute('data-id');
+                if (objId) {
+                    object.id = objId;
+                    object.exists = true;
+                }
+                else {
+                    let randNum = Math.floor(Math.random() * 1000);
+                    object.id = moment().format('x') + randNum;
+                    object.exists = false;
+                }
+                object.title = headline.value;
+                object.message = message.value;
+                object.dateAdded = moment().toISOString();
+                object.remindFrom = timeObj.toISOString();
+                object.status = statusSelector.value || 'normal';
+                if (intervalYes.classList.contains('selected')) {
+                    object.interval = {
+                        'time': Number(intervalNumberInput.value),
+                        'units': intervalPeriod.value
+                    }
+                }
+
+                return object;
+            }
+
+        } // end of renderContentForm
+
+        function renderScheduleList(scheduleList) { 
+            scheduleList.forEach((reminderObj) => {
+                renderSideReminder(reminderObj);
+            });
+        }
+
+        function renderSideReminder(reminderObj) {
+            let reminder = reminderObj.reminder;
+            let liBG = document.createElement('div');
+            liBG.classList.add('reminder-item-container');
+            liBG.setAttribute('data-id', reminder.id);
+            let status = reminder.status.toLowerCase();
+            switch(status) {
+                case 'urgent':
+                    liBG.classList.add('urgent');
+                    break;
+                case 'chill':
+                    liBG.classList.add('chill');
+                    break;
+            }
+
+            let li = document.createElement('li');
+            li.classList.add('reminder-item');
+            li.classList.add('hvr-sweep-to-right');
+            li.classList.add('hvr-forward');
+
+            if (reminder.overdue) {
+                let warning = document.createElement('div');
+                warning.classList.add('overdue-warning');
+                li.appendChild(warning);
+            }
+
+            let cross = document.createElement('div');
+            cross.classList.add('reminder-close-button');
+            let icon = document.createElement('div');
+            icon.classList.add('reminder-close-icon');
+            cross.appendChild(icon);
+
+            let title = document.createElement('h3');
+            title.classList.add('title');
+            title.innerText = reminder.title;
+
+            let message = document.createElement('p');
+            message.classList.add('message');
+            message.innerText = reminder.message;
+
+            let time = document.createElement('div');
+            time.classList.add('time');
+            let timeT = document.createElement('div');
+            timeT.classList.add('time-time');
+            timeT.innerText = moment(reminder.remindFrom).format('h:mm A');
+            time.appendChild(timeT);
+            let timeD = document.createElement('div');
+            timeD.classList.add('time-date');
+            timeD.innerText = moment(reminder.remindFrom).format('DD/MM/YYYY');
+            time.appendChild(timeD);
+
+            li.appendChild(cross);
+            li.appendChild(title);
+            li.appendChild(message);
+            li.appendChild(time);
+            liBG.appendChild(li);
+            reminderList.appendChild(liBG);
+        }
+
+        function updateSideReminder(reminderObj) {
+            let initScroll = reminderList.parentElement.scrollTop;
+            let reminder = reminderObj.reminder;
+            for (let i = 0; i < reminderList.children.length; i++) {
+                if (reminderList.children[i].getAttribute('data-id') === reminder.id) {
+
+                    reminderList.children[i].classList.remove("urgent", "chill");
+                    if (reminder.status !== 'normal') {
+                        reminderList.children[i].classList.add(reminder.status);
+                    }
+
+                    let li = reminderList.children[i].querySelector('.reminder-item');
+
+                    let warning = li.querySelector('.overdue-warning');
+                    if (!warning) {
+                        if (reminder.overdue) {
+                            let warning = document.createElement('div');
+                            warning.classList.add('overdue-warning');
+                            li.appendChild(warning);
+                        }
+                    } else {
+                        if (!reminder.overdue) {
+                            warning.remove();
+                        }
+                    }
+
+                    let title = li.querySelector('.title');
+                    title.innerText = reminder.title;
+
+                    let message = li.querySelector('.message');
+                    message.innerText = reminder.message;
+
+                    let timeT = li.querySelector('.time-time');
+                    timeT.innerText = moment(reminder.remindFrom).format('h:mm A');
+
+                    let timeD = li.querySelector('.time-date');
+                    timeD.innerText = moment(reminder.remindFrom).format('DD/MM/YYYY');
+
+                    reminderList.parentElement.scrollTop = initScroll;
+
+                    return;
+                }
+            }
+        }
+
+
+        /**
+         * EVENT LISTENERS & ASSOCIATED FUNCTIONS
+         **/
+
+
+        // ADD REMINDER BUTTON
+        document.querySelector('.menu-add-button').addEventListener('click', function(e) {
+
+            // De-activate any active reminders
+            let currentlyActiveList = reminderList.querySelectorAll('.active-item');
+            currentlyActiveList.forEach((el) => {
+                el.classList.remove('active-item');
+            });
+
+            renderReminderForm();
+        
+        });
+
+
+        // REMINDER MENU
+        reminderList.addEventListener('click', function(e) {
+
+            let el = e.target;
+
+            for ( ; el && el !== reminderList; el = el.parentNode) {
+                if (el.classList.contains('reminder-close-button')) {
+                    deleteReminder(el.parentNode);
+                }
+                if (el.classList.contains('reminder-item')) {
+                    handleReminderClick(el);
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+        });
+
+        function handleReminderClick(el) {
+            
+            // Trigger/re-trigger animation
+            el.classList.remove('click-backwards');
+            void el.offsetWidth; // animation won't re-trigger without this line
+            el.classList.add('click-backwards');
+
+            // Set element state to active and de-active the rest
+            let currentlyActiveList = reminderList.querySelectorAll('.active-item');
+            currentlyActiveList.forEach((activeEl) => {
+                // Avoid deactivating the clicked element
+                if (activeEl === el) return;
+                // Set a delay on removing the class so that the animation can finish smoothly
+                setTimeout(() => activeEl.classList.remove('active-item') , 550);
+            });
+            el.classList.add('active-item');
+
+            // Send a request to update the content view
+            let id = el.parentNode.getAttribute('data-id');
+            ipcRenderer.send('request:reminder', id);
+        }
+
+        function deleteReminder(el) {
+
+            // If item is open during deletion then clear the content from view
+            if (el.classList.contains('active-item')) {
+                document.querySelector('.content-view').innerHTML = '';
+            }
+
+            // Send request to main program to remove reminder from memory
+            const id = el.parentNode.getAttribute('data-id');
+            ipcRenderer.send('schedule:remove', id);
+
+            // Delete html element
+            let sidebarEl = document.querySelector('.content-sidebar');
+            let scrollAmount = sidebarEl.scrollTop;
+            el.remove();
+            sidebarEl.scrollTop = scrollAmount;
+        }
+        
+    </script>
+
+</body>
+</html>

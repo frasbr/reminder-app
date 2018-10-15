@@ -1,0 +1,16 @@
+{
+  "name": "reminder-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Fraser Rosebery",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "^2.0.9",
+    "moment": "^2.22.2",
+    "node-notifier": "^5.2.1"
+  }
+}
